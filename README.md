@@ -11,14 +11,22 @@ GPIO layer that is easy to read, test, modify, and adapt.
 Current validation target:
 
 * Device: dsPIC33AK512MPS512
-* Compiler: XC-DSC
-* DFP: Microchip dsPIC33AK-MP DFP 1.3.185 or compatible
+* Compiler: XC-DSC v3.31.01
+* DFP: Microchip dsPIC33AK-MP DFP 1.3.185 (or compatible)
 
 The port register table is built from `#if defined(LATx)` presence tests, so it
 adapts to whichever ports the selected device header defines, without
-device-name conditionals. Hardware validation has been performed driving LEDs,
-push-button input, and external-device control lines (chip-select / reset /
-write-protect), and as the digital pin pre-configuration for peripheral signals.
+device-name conditionals.
+
+This HAL is used in a larger board project; on the dsPIC33AK512MPS512 target it
+has been validated for:
+
+* LED output
+* button input
+* external SPI-flash control pins (chip-select / reset / write-protect)
+* UART1 pin pre-configuration
+* ADC analog input pre-configuration
+* TDM / I2S peripheral pin pre-configuration
 
 Confirmed operations on the validation target:
 
@@ -43,7 +51,7 @@ This HAL is intentionally small.
 * This HAL owns only the GPIO attribute/data registers
   (`ANSEL` / `TRIS` / `LAT` / `PORT` / `CNPU` / `CNPD` / `ODC`). PPS (peripheral
   pin select) routing belongs to the board layer.
-* Change-notification (CN) / edge interrupts are out of scope for now.
+* Change-notification (CN) / edge interrupts are out of scope.
 * The accessors are plain read-modify-write and do NOT disable interrupts; if a
   port is updated from both main-line code and an ISR, the caller provides the
   mutual exclusion.
@@ -91,7 +99,8 @@ board-level name:
 ```
 
 Port codes are `DSPIC33AK_GPIO_PORT_A` .. `DSPIC33AK_GPIO_PORT_H`; `bit` is
-`0..15`.
+`0..15`. `bit` must be `0..15`; values outside this range are masked by the
+macro and should not be used.
 
 ## Basic usage
 
@@ -182,6 +191,9 @@ automatically and the driver body stays device-neutral.
   pointers to match the DFP device headers.
 * This HAL is the GPIO layer only; PPS routing and change-notification belong to
   other layers.
+* This HAL checks whether a GPIO port exists in the selected device header. It
+  does not check whether a specific package exposes that pin. Package-level and
+  board-level pin validity must be handled by the board layer.
 * This repository does not include Microchip DFP header files.
 
 ## License

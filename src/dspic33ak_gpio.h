@@ -6,15 +6,15 @@
  * ----------------
  * Small, readable GPIO HAL for dsPIC33AK devices.
  *
- * Scope (Step 1, intentionally small):
+ * Scope (intentionally small):
  *   - per-pin direction (input / output)
  *   - per-pin pull-up / pull-down / none
  *   - per-pin analog / digital select (ANSEL)
  *   - per-pin open-drain enable
  *   - output write / set / clear / toggle, input read
  *
- * Out of scope (for now):
- *   - change-notification (CN) / edge interrupts  (reserved for a later step)
+ * Out of scope:
+ *   - change-notification (CN) / edge interrupts
  *   - PPS (peripheral pin select) routing          (separate concern)
  *
  * Pin addressing:
@@ -69,6 +69,8 @@ typedef uint16_t dspic33ak_gpio_pin_t;
  * DSPIC33AK_GPIO_PIN(port, bit)
  * - port : a DSPIC33AK_GPIO_PORT_* code
  * - bit  : 0..15
+ * bit must be 0..15. Values outside this range are masked by the macro and
+ * should not be used.
  * Use this (and a board-level name) instead of a raw pin number.
  */
 #define DSPIC33AK_GPIO_PIN(port, bit) \
@@ -105,6 +107,16 @@ typedef struct
  * false if the pin's port is not present on the device (no register row);
  * otherwise true. dspic33ak_gpio_read() returns the pin level, or false for a
  * pin whose port is not present.
+ *
+ * Return-value contract:
+ *   - The setter / config functions return false only when the port is not
+ *     present in the selected device header, or (for dspic33ak_gpio_config())
+ *     when config is NULL.
+ *   - false does NOT indicate an electrical pin fault; it means "this device
+ *     header has no register for that port".
+ *   - This HAL does not check whether a given package actually exposes the pin.
+ *     Package-level and board-level pin validity are the board layer's
+ *     responsibility.
  */
 bool dspic33ak_gpio_set_direction(dspic33ak_gpio_pin_t pin, dspic33ak_gpio_dir_t dir);
 bool dspic33ak_gpio_set_pull(dspic33ak_gpio_pin_t pin, dspic33ak_gpio_pull_t pull);
