@@ -128,13 +128,16 @@ static void sw3_event_cb(dspic33ak_gpio_pin_t pin,
     sw3_changed = true;
 }
 
-(void)dspic33ak_gpio_set_analog(BOARD_SW3, false);
-(void)dspic33ak_gpio_set_direction(BOARD_SW3, DSPIC33AK_GPIO_DIR_INPUT);
-(void)dspic33ak_gpio_set_pull(BOARD_SW3, DSPIC33AK_GPIO_PULL_UP);
-(void)dspic33ak_gpio_event_attach(BOARD_SW3,
-                                  DSPIC33AK_GPIO_EVENT_EDGE_EITHER,
-                                  sw3_event_cb,
-                                  0);
+void app_gpio_event_init(void)
+{
+    (void)dspic33ak_gpio_set_analog(BOARD_SW3, false);
+    (void)dspic33ak_gpio_set_direction(BOARD_SW3, DSPIC33AK_GPIO_DIR_INPUT);
+    (void)dspic33ak_gpio_set_pull(BOARD_SW3, DSPIC33AK_GPIO_PULL_UP);
+    (void)dspic33ak_gpio_event_attach(BOARD_SW3,
+                                      DSPIC33AK_GPIO_EVENT_EDGE_EITHER,
+                                      sw3_event_cb,
+                                      0);
+}
 ```
 
 ## Current Validation Behavior
