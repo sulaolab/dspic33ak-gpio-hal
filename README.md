@@ -41,32 +41,22 @@ Confirmed operations on the validation target:
 * Per-pin open-drain enable
 * One-shot `dspic33ak_gpio_config()` with a glitch-aware apply order
 * Output write / set / clear / toggle
-* Input read (PORT) and output-latch read-back (LAT), 3-state level result
-* RP-first addressing (RPn) over the packed-pin core
-* Optional PPS peripheral-pin routing (companion `dspic33ak_pps.*`), exercised by
-  the SPI / UART / TDM pin routing in the perseus board project
+* Input read (PORT) and output-latch read-back (LAT)
 * Optional GPIO CN event dispatch layer, validated in `dspic33ak-hal-starter`
 
 ## Design policy
 
 This HAL is intentionally small.
 
-* A pin is addressed either by its Remappable-Pin number (RPn) through the
-  **RP-first API** (preferred for normal board and application code) or by a
-  packed `(port, bit)` handle through the **core packed-pin API** (for non-RP
-  pins, low-level GPIO, or HAL internals). Both APIs reach the same GPIO
-  register implementation; the RP-first functions are thin wrappers that convert
-  RPn to a packed pin and delegate to the core.
+* The API is plain and synchronous; one packed pin handle identifies a pin.
 * No XC-DSC / DFP bitfield structures (`LATxbits` / `TRISxbits` / ...) are
   exposed in the public API.
 * Device-specific register symbols are isolated in a small per-port pointer
   table. The table is built from `#if defined(LATx)` presence tests, so it
   adapts to the device without device-name conditionals.
-* The core GPIO layer (`dspic33ak_gpio.*`) owns only the GPIO attribute/data
-  registers (`ANSEL` / `TRIS` / `LAT` / `PORT` / `CNPU` / `CNPD` / `ODC`). PPS
-  signal routing is a separate, optional companion module (`dspic33ak_pps.*`) in
-  this same family; the board layer owns the policy — which signal maps to which
-  RP pin.
+* This HAL owns only the GPIO attribute/data registers
+  (`ANSEL` / `TRIS` / `LAT` / `PORT` / `CNPU` / `CNPD` / `ODC`). PPS (peripheral
+  pin select) routing belongs to the board layer.
 * The core GPIO layer does not own interrupt vectors. The optional CN event
   layer only dispatches registered GPIO events when the application calls it
   from an app-owned vector.
@@ -81,13 +71,12 @@ In scope:
 * Direction, pull, analog/digital, open-drain configuration
 * Output write / set / clear / toggle
 * Input read and output-latch read-back
-* RP-first addressing (RPn) as a thin adapter over the packed-pin core
-* Optional PPS (peripheral pin select) routing — companion `dspic33ak_pps.*`
 * Optional Change Notification (CN) event attach/detach/dispatch
 * Any port present on the device (A..H as defined by the device header)
 
 Out of scope (not handled here):
 
+* PPS (peripheral pin select) routing — board layer
 * HAL-owned interrupt vectors
 * Debounce or new event semantics beyond the validated CN event layer
 * Atomic set/clear via dedicated SFRs (accessors are read-modify-write)
@@ -97,11 +86,9 @@ Out of scope (not handled here):
 
 ```text
 src/
-  dspic33ak_gpio.c        core GPIO (attributes + data) + RP-first adapter
+  dspic33ak_gpio.c
   dspic33ak_gpio.h
-  dspic33ak_pps.c         optional PPS (peripheral pin select) routing
-  dspic33ak_pps.h
-  dspic33ak_gpio_event.c  optional Change Notification (CN) event layer
+  dspic33ak_gpio_event.c
   dspic33ak_gpio_event.h
   dspic33ak_gpio_reg.h
 docs/
@@ -112,29 +99,14 @@ docs/
 32-bit pointers and bit masks; the driver body drives any port through a
 per-port pointer table.
 
-The two optional companions are compiled only when their feature is used:
-compile `dspic33ak_gpio_event.c` only when CN event support is needed, and
-`dspic33ak_pps.c` only when the board routes peripherals through PPS.
+Consumer projects should compile `dspic33ak_gpio_event.c` only when CN event
+support is needed.
 
 ## Pin addressing
 
-Two addressing styles are supported. Use RP-first for PPS-capable board and
-application pins; use packed-pin for non-RP pins or low-level core usage.
-
-**RP-first (preferred for board/application code with PPS):** a pin is
-identified by its Remappable-Pin number `RPn` — the same number the PPS map
-uses — so the GPIO call and the PPS route refer to the pin identically:
-
-```c
-#define BOARD_UART1_TX_RP  (114u)   /* U1TX -> RH1 */
-
-dspic33ak_gpio_rp_config_digital_output(BOARD_UART1_TX_RP, true);
-dspic33ak_pps_route_output(DSPIC33AK_PPS_OUTPUT_U1TX, BOARD_UART1_TX_RP);
-```
-
-**Packed-pin (core API — for non-RP pins or HAL internals):** a pin is a
-packed number `(port << 4) | bit`. Always build it with
-`DSPIC33AK_GPIO_PIN(port, bit)` and give it a board-level name:
+A pin is a single packed number, `(port << 4) | bit`. Do not write the raw
+number; always build it with `DSPIC33AK_GPIO_PIN(port, bit)` and give it a
+board-level name:
 
 ```c
 #include "dspic33ak_gpio.h"
@@ -144,8 +116,8 @@ packed number `(port << 4) | bit`. Always build it with
 ```
 
 Port codes are `DSPIC33AK_GPIO_PORT_A` .. `DSPIC33AK_GPIO_PORT_H`; `bit` is
-`0..15`. Values outside this range are masked by the macro and should not be
-used.
+`0..15`. `bit` must be `0..15`; values outside this range are masked by the
+macro and should not be used.
 
 ## Basic usage
 
@@ -176,9 +148,7 @@ const dspic33ak_gpio_config_t btn_cfg = {
 };
 (void)dspic33ak_gpio_config(BOARD_BUTTON, &btn_cfg);
 
-/* read() returns a 3-state level (ERROR / LOW / HIGH) -- not a bool. Handle
- * DSPIC33AK_GPIO_LEVEL_ERROR first, then compare against LOW / HIGH. */
-bool pressed = (dspic33ak_gpio_read(BOARD_BUTTON) == DSPIC33AK_GPIO_LEVEL_LOW);  /* active-low */
+bool pressed = (dspic33ak_gpio_read(BOARD_BUTTON) == false);  /* active-low */
 ```
 
 Individual attribute setters are also available when one-shot config is not
@@ -214,13 +184,9 @@ void __attribute__((__interrupt__, __no_auto_psv__)) _CNBInterrupt(void)
 
 ## API summary
 
-### Packed-pin core API
+Configuration:
 
-Configuration (glitch-aware apply order: analog → pull → open-drain → LAT → direction):
-
-* `dspic33ak_gpio_config()` — one-shot via config struct
-* `dspic33ak_gpio_config_digital_input()` — shortcut: digital input, no pull
-* `dspic33ak_gpio_config_digital_output()` — shortcut: digital output, seeds LAT first
+* `dspic33ak_gpio_config()`        — one-shot, glitch-aware apply order
 * `dspic33ak_gpio_set_direction()`
 * `dspic33ak_gpio_set_pull()`
 * `dspic33ak_gpio_set_analog()`
@@ -233,55 +199,10 @@ Output:
 * `dspic33ak_gpio_clear()` — drive low
 * `dspic33ak_gpio_toggle()`
 
-Input / read-back (return a 3-state `dspic33ak_gpio_level_t`, **not a bool**):
+Input / read-back:
 
 * `dspic33ak_gpio_read()`        — pin level from `PORT`
 * `dspic33ak_gpio_read_output()` — driven latch from `LAT`
-
-### RP-first API
-
-Thin wrappers over the packed-pin core (convert RPn → packed pin, then call
-the matching core function). Preferred for board and application code that uses
-PPS-capable pins. Do not duplicate register-access logic.
-
-Conversion:
-
-* `dspic33ak_gpio_pin_from_rp()`
-* `dspic33ak_gpio_rp_from_pin()`
-
-Full configuration (via config struct):
-
-* `dspic33ak_gpio_rp_config()`
-
-Individual attribute setters:
-
-* `dspic33ak_gpio_rp_set_direction()`
-* `dspic33ak_gpio_rp_set_pull()`
-* `dspic33ak_gpio_rp_set_analog()`
-* `dspic33ak_gpio_rp_set_open_drain()`
-
-Digital shortcuts (most common cases):
-
-* `dspic33ak_gpio_rp_config_digital_input()`
-* `dspic33ak_gpio_rp_config_digital_output()`
-
-Output operations:
-
-* `dspic33ak_gpio_rp_write()`
-* `dspic33ak_gpio_rp_set()`
-* `dspic33ak_gpio_rp_clear()`
-* `dspic33ak_gpio_rp_toggle()`
-
-Read operations (3-state `dspic33ak_gpio_level_t`, **not a bool**):
-
-* `dspic33ak_gpio_rp_read()`
-* `dspic33ak_gpio_rp_read_output()`
-
-Optional PPS routing (`dspic33ak_pps.*`, compiled only when used):
-
-* `dspic33ak_pps_route_output()` — drive a peripheral output onto an RP pin
-* `dspic33ak_pps_route_input()`  — feed a peripheral input from an RP pin
-* `dspic33ak_pps_unlock()` / `_lock()` — IOLOCK gate for direct PPS writers
 
 Optional event layer:
 
@@ -289,13 +210,10 @@ Optional event layer:
 * `dspic33ak_gpio_event_detach()`      — unregister one packed-pin event
 * `dspic33ak_gpio_event_process_isr()` — app-called CN event dispatcher
 
-The setters take a packed pin from `DSPIC33AK_GPIO_PIN()` (or use the RP-first
-wrappers) and return `false` if the pin's port is not present on the device (no
-register row), otherwise `true`. `dspic33ak_gpio_read()` / `read_output()`
-return a 3-state `dspic33ak_gpio_level_t` — `DSPIC33AK_GPIO_LEVEL_ERROR` (`-1`)
-for a pin whose port is not present, else `..._LOW` (`0`) / `..._HIGH` (`1`).
-Do not use the result directly as a bool (ERROR is truthy); compare against the
-named constants and handle ERROR first.
+Every function takes a packed pin from `DSPIC33AK_GPIO_PIN()`. The setters
+return `false` if the pin's port is not present on the device (no register row),
+otherwise `true`. `dspic33ak_gpio_read()` / `read_output()` return the level, or
+`false` for a pin whose port is not present.
 
 ## Glitch-aware order
 
@@ -315,9 +233,8 @@ automatically and the driver body stays device-neutral.
 
 * The GPIO SFRs are 32-bit on the dsPIC33A core; the register layer uses 32-bit
   pointers to match the DFP device headers.
-* The core `dspic33ak_gpio.*` layer drives GPIO attributes/data only; PPS signal
-  routing lives in the optional companion `dspic33ak_pps.*`. The board layer
-  still owns the policy — which signal maps to which RP pin.
+* This HAL is the GPIO layer only; PPS routing belongs to the board/application
+  layer.
 * The optional event layer does not change ANSEL, TRIS, CNPU/CNPD, PPS,
   interrupt priority, or IEC enable bits in `dspic33ak_gpio_event_attach()`.
 * CMSIS-Driver GPIO-style wrappers are intentionally kept in separate

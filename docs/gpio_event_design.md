@@ -97,8 +97,9 @@ callback stays small and does not directly touch LED outputs.
 - interrupt enable bits
 
 The application must configure the pin as a digital input before attaching an
-event. Use `dspic33ak_gpio_config()` with an explicit config struct for a
-single-call, glitch-aware setup:
+event. In the original validation app, the app cleared ANSEL, set input
+direction, and enabled the pull-up for SW1, SW2, and SW3 before attaching the
+SW3 event.
 
 ## Consumer Snippet
 
@@ -129,14 +130,9 @@ static void sw3_event_cb(dspic33ak_gpio_pin_t pin,
 
 void app_gpio_event_init(void)
 {
-    static const dspic33ak_gpio_config_t sw_cfg = {
-        .dir          = DSPIC33AK_GPIO_DIR_INPUT,
-        .pull         = DSPIC33AK_GPIO_PULL_UP,
-        .analog       = false,
-        .open_drain   = false,
-        .initial_high = false,
-    };
-    (void)dspic33ak_gpio_config(BOARD_SW3, &sw_cfg);
+    (void)dspic33ak_gpio_set_analog(BOARD_SW3, false);
+    (void)dspic33ak_gpio_set_direction(BOARD_SW3, DSPIC33AK_GPIO_DIR_INPUT);
+    (void)dspic33ak_gpio_set_pull(BOARD_SW3, DSPIC33AK_GPIO_PULL_UP);
     (void)dspic33ak_gpio_event_attach(BOARD_SW3,
                                       DSPIC33AK_GPIO_EVENT_EDGE_EITHER,
                                       sw3_event_cb,
@@ -183,36 +179,12 @@ wrapper:
 - `dspic33ak_gpio_event_attach()` can become the basis for event callbacks after
   edge policy, debounce, and ownership rules are defined.
 
-## Resolved decisions
+Open decisions for a later CMSIS-like layer:
 
-### PPS ownership
-
-`dspic33ak_pps.*` is a generic companion module in the GPIO HAL family. It
-handles PPS register routing without board-specific knowledge. Actual
-signal-to-RP assignments remain in the board layer (`board.c` /
-`board_pins.h`).
-
-### Pin representation
-
-PPS-capable pins use RP-first addressing (`dspic33ak_gpio_rp_*`) in normal
-board and application code. Non-PPS GPIO-only pins and low-level GPIO core
-calls may use packed `(port, bit)` handles.
-
-### ANSEL ownership
-
-The caller explicitly selects analog or digital operation. The one-shot
-`dspic33ak_gpio_config()` helper applies the caller-specified `analog` field;
-the `config_digital_input/output()` shortcuts set `analog=false`. GPIO init
-does not automatically force ANSEL — this is intentional so analog-input pins
-can be configured independently.
-
-## Open CN-event questions
-
-The following remain open and are intentionally deferred:
-
-- **Single-edge attach** (`FALLING` / `RISING`): deferred until the dsPIC33AK
-  `CNEN0x`/`CNEN1x` polarity mapping is finalized for the wrapper API.
-- **Debounce filtering**: not implemented.
-- **Multiple callback slots per pin**: currently one slot per port bit.
-- **Shared CN-port ownership**: the dispatcher does not arbitrate with unrelated
-  code that directly modifies `CNENx`, `CNFx`, or the same port interrupt flag.
+- whether GPIO init should automatically force ANSEL to digital
+- how analog-capable pins should be protected from accidental digital use
+- how PPS ownership should be represented without moving PPS into the HAL
+- whether pin handles should stay as packed `port + bit` values or use board
+  enum IDs
+- whether single-edge attach should be exposed before fully documenting
+  dsPIC33AK `CNEN0x`/`CNEN1x` polarity
