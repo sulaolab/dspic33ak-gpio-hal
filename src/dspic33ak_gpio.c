@@ -309,24 +309,46 @@ bool dspic33ak_gpio_toggle(dspic33ak_gpio_pin_t pin)
     return true;
 }
 
-bool dspic33ak_gpio_read(dspic33ak_gpio_pin_t pin)
+dspic33ak_gpio_level_t dspic33ak_gpio_read(dspic33ak_gpio_pin_t pin)
 {
     const dspic33ak_gpio_regs_t *r = dspic33ak_gpio_regs_for(pin);
     if (r == 0)
     {
-        return false;
+        return DSPIC33AK_GPIO_LEVEL_ERROR;
     }
-    return dspic33ak_gpio_reg_is_set(r->port, dspic33ak_gpio_mask(pin));
+    return dspic33ak_gpio_reg_is_set(r->port, dspic33ak_gpio_mask(pin))
+           ? DSPIC33AK_GPIO_LEVEL_HIGH : DSPIC33AK_GPIO_LEVEL_LOW;
 }
 
-bool dspic33ak_gpio_read_output(dspic33ak_gpio_pin_t pin)
+dspic33ak_gpio_level_t dspic33ak_gpio_read_output(dspic33ak_gpio_pin_t pin)
 {
     const dspic33ak_gpio_regs_t *r = dspic33ak_gpio_regs_for(pin);
     if (r == 0)
     {
-        return false;
+        return DSPIC33AK_GPIO_LEVEL_ERROR;
     }
-    return dspic33ak_gpio_reg_is_set(r->lat, dspic33ak_gpio_mask(pin));
+    return dspic33ak_gpio_reg_is_set(r->lat, dspic33ak_gpio_mask(pin))
+           ? DSPIC33AK_GPIO_LEVEL_HIGH : DSPIC33AK_GPIO_LEVEL_LOW;
+}
+
+bool dspic33ak_gpio_config_digital_input(dspic33ak_gpio_pin_t pin)
+{
+    const dspic33ak_gpio_config_t cfg =
+    {
+        .dir = DSPIC33AK_GPIO_DIR_INPUT,  .pull = DSPIC33AK_GPIO_PULL_NONE,
+        .analog = false, .open_drain = false, .initial_high = false,
+    };
+    return dspic33ak_gpio_config(pin, &cfg);
+}
+
+bool dspic33ak_gpio_config_digital_output(dspic33ak_gpio_pin_t pin, bool initial_high)
+{
+    const dspic33ak_gpio_config_t cfg =
+    {
+        .dir = DSPIC33AK_GPIO_DIR_OUTPUT, .pull = DSPIC33AK_GPIO_PULL_NONE,
+        .analog = false, .open_drain = false, .initial_high = initial_high,
+    };
+    return dspic33ak_gpio_config(pin, &cfg);
 }
 
 
@@ -355,4 +377,164 @@ static const dspic33ak_gpio_regs_t *dspic33ak_gpio_regs_for(dspic33ak_gpio_pin_t
 static uint32_t dspic33ak_gpio_mask(dspic33ak_gpio_pin_t pin)
 {
     return (uint32_t)1u << (pin & 0x0Fu);
+}
+
+//===========================================================
+// Remappable-pin (RPn) <-> packed-pin conversion. See the RP-first section in
+// dspic33ak_gpio.h. Flat encoding rule (no table): RPn = packed_pin + 1.
+// Range-only validation (encoding); package bonding is not checked here.
+//===========================================================
+bool dspic33ak_gpio_pin_from_rp(uint8_t rp, dspic33ak_gpio_pin_t *pin)
+{
+    if (pin == 0 || rp == 0u || rp > DSPIC33AK_GPIO_RP_MAX)
+    {
+        return false;
+    }
+    *pin = (dspic33ak_gpio_pin_t)((uint16_t)rp - 1u);
+    return true;
+}
+
+bool dspic33ak_gpio_rp_from_pin(dspic33ak_gpio_pin_t pin, uint8_t *rp)
+{
+    if (rp == 0 || (uint16_t)pin >= DSPIC33AK_GPIO_RP_MAX)
+    {
+        return false;
+    }
+    *rp = (uint8_t)((uint16_t)pin + 1u);
+    return true;
+}
+
+//===========================================================
+// RP adapter API. Thin wrappers: convert RPn -> packed pin (the validated
+// dspic33ak_gpio_pin_from_rp), then call the packed-pin function. No GPIO
+// register access and no copy of the RP->pin formula here.
+//===========================================================
+bool dspic33ak_gpio_rp_config(dspic33ak_gpio_rp_t rp, const dspic33ak_gpio_config_t *config)
+{
+    dspic33ak_gpio_pin_t pin;
+    if (!dspic33ak_gpio_pin_from_rp(rp, &pin))
+    {
+        return false;
+    }
+    return dspic33ak_gpio_config(pin, config);
+}
+
+bool dspic33ak_gpio_rp_set_direction(dspic33ak_gpio_rp_t rp, dspic33ak_gpio_dir_t dir)
+{
+    dspic33ak_gpio_pin_t pin;
+    if (!dspic33ak_gpio_pin_from_rp(rp, &pin))
+    {
+        return false;
+    }
+    return dspic33ak_gpio_set_direction(pin, dir);
+}
+
+bool dspic33ak_gpio_rp_set_pull(dspic33ak_gpio_rp_t rp, dspic33ak_gpio_pull_t pull)
+{
+    dspic33ak_gpio_pin_t pin;
+    if (!dspic33ak_gpio_pin_from_rp(rp, &pin))
+    {
+        return false;
+    }
+    return dspic33ak_gpio_set_pull(pin, pull);
+}
+
+bool dspic33ak_gpio_rp_set_analog(dspic33ak_gpio_rp_t rp, bool analog)
+{
+    dspic33ak_gpio_pin_t pin;
+    if (!dspic33ak_gpio_pin_from_rp(rp, &pin))
+    {
+        return false;
+    }
+    return dspic33ak_gpio_set_analog(pin, analog);
+}
+
+bool dspic33ak_gpio_rp_set_open_drain(dspic33ak_gpio_rp_t rp, bool enable)
+{
+    dspic33ak_gpio_pin_t pin;
+    if (!dspic33ak_gpio_pin_from_rp(rp, &pin))
+    {
+        return false;
+    }
+    return dspic33ak_gpio_set_open_drain(pin, enable);
+}
+
+bool dspic33ak_gpio_rp_config_digital_input(dspic33ak_gpio_rp_t rp)
+{
+    dspic33ak_gpio_pin_t pin;
+    if (!dspic33ak_gpio_pin_from_rp(rp, &pin))
+    {
+        return false;
+    }
+    return dspic33ak_gpio_config_digital_input(pin);
+}
+
+bool dspic33ak_gpio_rp_config_digital_output(dspic33ak_gpio_rp_t rp, bool initial_high)
+{
+    dspic33ak_gpio_pin_t pin;
+    if (!dspic33ak_gpio_pin_from_rp(rp, &pin))
+    {
+        return false;
+    }
+    return dspic33ak_gpio_config_digital_output(pin, initial_high);
+}
+
+bool dspic33ak_gpio_rp_set(dspic33ak_gpio_rp_t rp)
+{
+    dspic33ak_gpio_pin_t pin;
+    if (!dspic33ak_gpio_pin_from_rp(rp, &pin))
+    {
+        return false;
+    }
+    return dspic33ak_gpio_set(pin);
+}
+
+bool dspic33ak_gpio_rp_clear(dspic33ak_gpio_rp_t rp)
+{
+    dspic33ak_gpio_pin_t pin;
+    if (!dspic33ak_gpio_pin_from_rp(rp, &pin))
+    {
+        return false;
+    }
+    return dspic33ak_gpio_clear(pin);
+}
+
+bool dspic33ak_gpio_rp_toggle(dspic33ak_gpio_rp_t rp)
+{
+    dspic33ak_gpio_pin_t pin;
+    if (!dspic33ak_gpio_pin_from_rp(rp, &pin))
+    {
+        return false;
+    }
+    return dspic33ak_gpio_toggle(pin);
+}
+
+bool dspic33ak_gpio_rp_write(dspic33ak_gpio_rp_t rp, bool high)
+{
+    dspic33ak_gpio_pin_t pin;
+    if (!dspic33ak_gpio_pin_from_rp(rp, &pin))
+    {
+        return false;
+    }
+    return dspic33ak_gpio_write(pin, high);
+}
+
+dspic33ak_gpio_level_t dspic33ak_gpio_rp_read(dspic33ak_gpio_rp_t rp)
+{
+    dspic33ak_gpio_pin_t pin;
+    if (!dspic33ak_gpio_pin_from_rp(rp, &pin))
+    {
+        return DSPIC33AK_GPIO_LEVEL_ERROR;
+    }
+    return dspic33ak_gpio_read(pin);
+}
+
+dspic33ak_gpio_level_t dspic33ak_gpio_rp_read_output(dspic33ak_gpio_rp_t rp)
+{
+    dspic33ak_gpio_pin_t pin;
+    if (!dspic33ak_gpio_pin_from_rp(rp, &pin))
+    {
+        return DSPIC33AK_GPIO_LEVEL_ERROR;
+    }
+    return dspic33ak_gpio_read_output(pin);
 }
