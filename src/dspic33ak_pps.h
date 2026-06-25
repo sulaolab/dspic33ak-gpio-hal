@@ -31,10 +31,11 @@
  * (RP129..RP144) are intentionally NOT routable here -- if they are ever needed,
  * add a separate virtual-output API rather than overloading this GPIO-typed one.
  * route_input() rejects an rp that is not a physical pin on this device (returns
- * false before writing). The peripheral-SIGNAL enums below are the set this
- * repository currently routes (U1, SPI1/2/4, CLC1..3, CAN1, PWM1H/2H/3H) -- NOT
- * every PPS-capable peripheral the device has; add one by extending the enum plus
- * the matching case in dspic33ak_pps.c. Routing a signal absent on the selected
+ * false before writing). The peripheral-SIGNAL enums contain the signals currently
+ * required by this codebase (U1TX/RX, SPI1/2/4, CLC1-3, PWM1H/2H/3H,
+ * PWM5H/5L-8H/8L, REFI1, CAN1TX/RX); they do NOT represent every PPS-capable
+ * peripheral the device supports. Add a new signal by extending the enum and the
+ * matching case in dspic33ak_pps.c. Routing a signal absent on the selected
  * device returns false.
  *
  * Pairing with hal_gpio: PPS routing does NOT configure the pin's direction or
@@ -80,11 +81,19 @@ typedef enum
     DSPIC33AK_PPS_OUTPUT_CLC2,
     DSPIC33AK_PPS_OUTPUT_CLC3,
 
-    DSPIC33AK_PPS_OUTPUT_CAN1TX,
-
     DSPIC33AK_PPS_OUTPUT_PWM1H,
     DSPIC33AK_PPS_OUTPUT_PWM2H,
-    DSPIC33AK_PPS_OUTPUT_PWM3H
+    DSPIC33AK_PPS_OUTPUT_PWM3H,
+    DSPIC33AK_PPS_OUTPUT_PWM5H,
+    DSPIC33AK_PPS_OUTPUT_PWM5L,
+    DSPIC33AK_PPS_OUTPUT_PWM6H,
+    DSPIC33AK_PPS_OUTPUT_PWM6L,
+    DSPIC33AK_PPS_OUTPUT_PWM7H,
+    DSPIC33AK_PPS_OUTPUT_PWM7L,
+    DSPIC33AK_PPS_OUTPUT_PWM8H,
+    DSPIC33AK_PPS_OUTPUT_PWM8L,
+
+    DSPIC33AK_PPS_OUTPUT_CAN1TX
 } dspic33ak_pps_output_t;
 
 /*
@@ -109,6 +118,8 @@ typedef enum
     DSPIC33AK_PPS_INPUT_CLCINA,
     DSPIC33AK_PPS_INPUT_CLCINB,
     DSPIC33AK_PPS_INPUT_CLCINC,
+
+    DSPIC33AK_PPS_INPUT_REFI1,
 
     DSPIC33AK_PPS_INPUT_CAN1RX
 } dspic33ak_pps_input_t;

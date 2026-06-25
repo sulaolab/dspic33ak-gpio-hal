@@ -12,9 +12,10 @@
  *      map (see the RP-first section near the bottom), e.g.:
  *          dspic33ak_gpio_rp_config_digital_output(101u, false); // RP101
  *          dspic33ak_gpio_rp_set(101u);
- *   2. Packed-pin core API -- the core HAL and the advanced/fixed-function
- *      interface. The RP API is a thin adapter over it. Use the packed-pin API
- *      for non-RP pins, special attribute combinations, or HAL internals.
+ *   2. Packed-pin core API -- the core HAL and the fixed-function interface.
+ *      The RP API is a thin adapter over it. Use the packed-pin API for
+ *      non-RP pins, when a packed handle is more convenient, or for HAL
+ *      internals.
  *
  * Scope (intentionally small):
  *   - per-pin direction (input / output)
@@ -24,9 +25,9 @@
  *   - simple one-call digital input / output configuration
  *   - output write / set / clear / toggle; input read (3-state level result)
  *
- * Out of scope (each a separate, companion concern in the hal_gpio family):
- *   - change-notification (CN) / edge interrupts   (dspic33ak_gpio_event.*)
- *   - PPS (peripheral pin select) routing          (dspic33ak_pps.*)
+ * Out of scope:
+ *   - change-notification (CN) / edge interrupts
+ *   - PPS (peripheral pin select) routing          (separate concern)
  *
  * Packed pin addressing:
  *   A pin is a single packed number: (port << 4) | bit. Do NOT write the raw
@@ -185,15 +186,22 @@ dspic33ak_gpio_level_t dspic33ak_gpio_read_output(dspic33ak_gpio_pin_t pin);
 
 
 /*===========================================================================
- * RP-first API -- PREFERRED for normal board / application code.
+ * RP-first API -- address a pin by its Remappable-Pin number (the same RPn
+ * the PPS map uses), rather than by a packed (port, bit) pair.
  *
- * Address a pin by its Remappable-Pin number (the same RPn the PPS map uses).
- * Encoding is a flat rule, NO table: RPn = packed_pin + 1 = port*16 + bit + 1,
- * 1-based (0 = "no RP"). The functions below are thin adapters over the
- * packed-pin API above (convert RPn -> packed, then call it) and share its
- * return contract. This is the ENCODING/range layer only -- it does NOT check
- * package bonding or board availability (a per-device bonded-pin table can be
- * generated from the ATDF; see tools/atdf_rp_table).
+ * Encoding: RPn = packed_pin + 1 = port*16 + bit + 1, 1-based (0 = "no RP").
+ * The functions below are thin wrappers over the packed-pin API (convert RPn
+ * -> packed, then call it) and share its return contract. This is the
+ * ENCODING/range layer only -- it does NOT check package bonding or board
+ * availability. Package-level pin availability may be validated separately
+ * using device metadata such as Microchip ATDF files.
+ *
+ * Coverage: the RP-first API provides the same GPIO operations as the
+ * packed-pin API: full one-shot configuration (dspic33ak_gpio_rp_config),
+ * individual attribute setters (pull, analog, open-drain), simple digital
+ * input/output shortcuts, output write/set/clear/toggle, and 3-state read.
+ * Use packed-pin API only for non-RP pins or when a packed pin handle is
+ * more convenient.
  *===========================================================================*/
 
 /* Remappable-pin number. RPn is 1-based; 0 means "no RP". */
@@ -211,11 +219,25 @@ bool dspic33ak_gpio_pin_from_rp(uint8_t rp, dspic33ak_gpio_pin_t *pin);
 bool dspic33ak_gpio_rp_from_pin(dspic33ak_gpio_pin_t pin, uint8_t *rp);
 
 /*
- * Same semantics as the like-named packed-pin functions above. config_* set
- * analog off / no pull / no open-drain (output seeds LAT to initial_high first);
- * read / read_output return the 3-state dspic33ak_gpio_level_t -- handle
- * DSPIC33AK_GPIO_LEVEL_ERROR, do NOT use as a bool. All return false on an RP
- * conversion failure or the underlying GPIO failure.
+ * Full one-shot configuration via a config struct (thin wrapper over
+ * dspic33ak_gpio_config). Returns false on RP conversion failure, NULL config,
+ * or the underlying GPIO failure.
+ */
+bool dspic33ak_gpio_rp_config(dspic33ak_gpio_rp_t rp,
+                               const dspic33ak_gpio_config_t *config);
+
+/* Individual attribute setters (thin wrappers over the packed-pin setters). */
+bool dspic33ak_gpio_rp_set_direction(dspic33ak_gpio_rp_t rp, dspic33ak_gpio_dir_t dir);
+bool dspic33ak_gpio_rp_set_pull(dspic33ak_gpio_rp_t rp, dspic33ak_gpio_pull_t pull);
+bool dspic33ak_gpio_rp_set_analog(dspic33ak_gpio_rp_t rp, bool analog);
+bool dspic33ak_gpio_rp_set_open_drain(dspic33ak_gpio_rp_t rp, bool enable);
+
+/*
+ * Simple digital input/output shortcuts. config_digital_input sets direction
+ * input, analog off, no pull, no open-drain. config_digital_output sets
+ * direction output, analog off, no pull, no open-drain, and seeds LAT to
+ * initial_high before enabling the output driver (glitch-free).
+ * Return false on RP conversion failure or the underlying GPIO failure.
  */
 bool dspic33ak_gpio_rp_config_digital_input(dspic33ak_gpio_rp_t rp);
 bool dspic33ak_gpio_rp_config_digital_output(dspic33ak_gpio_rp_t rp, bool initial_high);

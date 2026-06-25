@@ -81,9 +81,6 @@ static bool dspic33ak_pps_get_output_code(dspic33ak_pps_output_t output, uint8_t
 #ifdef _RPOUT_CLC3OUT
     case DSPIC33AK_PPS_OUTPUT_CLC3: *code = (uint8_t)_RPOUT_CLC3OUT; return true;
 #endif
-#ifdef _RPOUT_CAN1TX
-    case DSPIC33AK_PPS_OUTPUT_CAN1TX: *code = (uint8_t)_RPOUT_CAN1TX; return true;
-#endif
 #ifdef _RPOUT_PWM1H
     case DSPIC33AK_PPS_OUTPUT_PWM1H: *code = (uint8_t)_RPOUT_PWM1H; return true;
 #endif
@@ -92,6 +89,33 @@ static bool dspic33ak_pps_get_output_code(dspic33ak_pps_output_t output, uint8_t
 #endif
 #ifdef _RPOUT_PWM3H
     case DSPIC33AK_PPS_OUTPUT_PWM3H: *code = (uint8_t)_RPOUT_PWM3H; return true;
+#endif
+#ifdef _RPOUT_PWM5H
+    case DSPIC33AK_PPS_OUTPUT_PWM5H: *code = (uint8_t)_RPOUT_PWM5H; return true;
+#endif
+#ifdef _RPOUT_PWM5L
+    case DSPIC33AK_PPS_OUTPUT_PWM5L: *code = (uint8_t)_RPOUT_PWM5L; return true;
+#endif
+#ifdef _RPOUT_PWM6H
+    case DSPIC33AK_PPS_OUTPUT_PWM6H: *code = (uint8_t)_RPOUT_PWM6H; return true;
+#endif
+#ifdef _RPOUT_PWM6L
+    case DSPIC33AK_PPS_OUTPUT_PWM6L: *code = (uint8_t)_RPOUT_PWM6L; return true;
+#endif
+#ifdef _RPOUT_PWM7H
+    case DSPIC33AK_PPS_OUTPUT_PWM7H: *code = (uint8_t)_RPOUT_PWM7H; return true;
+#endif
+#ifdef _RPOUT_PWM7L
+    case DSPIC33AK_PPS_OUTPUT_PWM7L: *code = (uint8_t)_RPOUT_PWM7L; return true;
+#endif
+#ifdef _RPOUT_PWM8H
+    case DSPIC33AK_PPS_OUTPUT_PWM8H: *code = (uint8_t)_RPOUT_PWM8H; return true;
+#endif
+#ifdef _RPOUT_PWM8L
+    case DSPIC33AK_PPS_OUTPUT_PWM8L: *code = (uint8_t)_RPOUT_PWM8L; return true;
+#endif
+#ifdef _RPOUT_CAN1TX
+    case DSPIC33AK_PPS_OUTPUT_CAN1TX: *code = (uint8_t)_RPOUT_CAN1TX; return true;
 #endif
     default:
         break;
@@ -969,6 +993,9 @@ bool dspic33ak_pps_route_input(dspic33ak_pps_input_t input, dspic33ak_gpio_rp_t 
 #endif
 #ifdef _CLCINCR
     case DSPIC33AK_PPS_INPUT_CLCINC: _CLCINCR = rp; break;
+#endif
+#ifdef _REFI1R
+    case DSPIC33AK_PPS_INPUT_REFI1: _REFI1R = rp; break;
 #endif
 #ifdef _CAN1RXR
     case DSPIC33AK_PPS_INPUT_CAN1RX: _CAN1RXR = rp; break;
