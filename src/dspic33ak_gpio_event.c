@@ -54,7 +54,7 @@ typedef struct
 //===========================================================
 
 static const dspic33ak_gpio_event_regs_t *dspic33ak_gpio_event_regs_for(dspic33ak_gpio_pin_t pin);
-static uint8_t                            dspic33ak_gpio_event_port_index(dspic33ak_gpio_pin_t pin);
+static unsigned                            dspic33ak_gpio_event_port_index(dspic33ak_gpio_pin_t pin);
 static uint8_t                            dspic33ak_gpio_event_bit_index(dspic33ak_gpio_pin_t pin);
 static uint32_t                           dspic33ak_gpio_event_mask(dspic33ak_gpio_pin_t pin);
 static bool                               dspic33ak_gpio_event_trigger_valid(dspic33ak_gpio_event_edge_t trigger);
@@ -124,7 +124,7 @@ bool dspic33ak_gpio_event_attach(dspic33ak_gpio_pin_t pin,
                                  void *user_data)
 {
     const dspic33ak_gpio_event_regs_t *regs = dspic33ak_gpio_event_regs_for(pin);
-    uint8_t port_index = dspic33ak_gpio_event_port_index(pin);
+    unsigned port_index = dspic33ak_gpio_event_port_index(pin);
     uint8_t bit_index = dspic33ak_gpio_event_bit_index(pin);
     uint32_t mask = dspic33ak_gpio_event_mask(pin);
 
@@ -156,7 +156,7 @@ bool dspic33ak_gpio_event_attach(dspic33ak_gpio_pin_t pin,
 bool dspic33ak_gpio_event_detach(dspic33ak_gpio_pin_t pin)
 {
     const dspic33ak_gpio_event_regs_t *regs = dspic33ak_gpio_event_regs_for(pin);
-    uint8_t port_index = dspic33ak_gpio_event_port_index(pin);
+    unsigned port_index = dspic33ak_gpio_event_port_index(pin);
     uint8_t bit_index = dspic33ak_gpio_event_bit_index(pin);
     uint32_t mask = dspic33ak_gpio_event_mask(pin);
 
@@ -252,7 +252,7 @@ void dspic33ak_gpio_event_process_isr(void)
 
 static const dspic33ak_gpio_event_regs_t *dspic33ak_gpio_event_regs_for(dspic33ak_gpio_pin_t pin)
 {
-    uint8_t port_index = dspic33ak_gpio_event_port_index(pin);
+    unsigned port_index = dspic33ak_gpio_event_port_index(pin);
 
     if (port_index >= DSPIC33AK_GPIO_EVENT_PORT_COUNT)
     {
@@ -265,9 +265,9 @@ static const dspic33ak_gpio_event_regs_t *dspic33ak_gpio_event_regs_for(dspic33a
     return &s_event_regs[port_index];
 }
 
-static uint8_t dspic33ak_gpio_event_port_index(dspic33ak_gpio_pin_t pin)
+static unsigned dspic33ak_gpio_event_port_index(dspic33ak_gpio_pin_t pin)
 {
-    return (uint8_t)(pin >> 4);
+    return (unsigned)(pin >> 4);
 }
 
 static uint8_t dspic33ak_gpio_event_bit_index(dspic33ak_gpio_pin_t pin)
