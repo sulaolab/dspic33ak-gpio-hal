@@ -11,8 +11,8 @@ driver and not a CMSIS Driver_GPIO implementation.
   handle ANSEL, TRIS, LAT, PORT, ODC, CNPU, and CNPD.
 - `src/dspic33ak_gpio_event.h` and `src/dspic33ak_gpio_event.c` provide the CN
   event layer above the existing GPIO pin representation.
-- A consumer application owns the board pin definitions, CN interrupt vector,
-  interrupt priority, and IEC enable bit.
+- A consumer application owns the board pin definitions, interrupt-vector
+  policy, and whether it uses the optional CN IRQ helpers.
 - The event layer is a library component; it does not bring an MPLAB X project
   file or any board-specific vector into this repository.
 
@@ -27,6 +27,35 @@ bool dspic33ak_gpio_event_attach(dspic33ak_gpio_pin_t pin,
                                  void *user_data);
 
 bool dspic33ak_gpio_event_detach(dspic33ak_gpio_pin_t pin);
+
+bool dspic33ak_gpio_event_irq_enable(dspic33ak_gpio_pin_t pin,
+                                     uint8_t priority);
+
+bool dspic33ak_gpio_event_irq_disable(dspic33ak_gpio_pin_t pin);
+
+bool dspic33ak_gpio_event_irq_is_enabled(dspic33ak_gpio_pin_t pin,
+                                         bool *enabled);
+
+bool dspic33ak_gpio_event_irq_set_enabled(dspic33ak_gpio_pin_t pin,
+                                          bool enable);
+
+bool dspic33ak_gpio_event_rp_attach(dspic33ak_gpio_rp_t rp,
+                                    dspic33ak_gpio_event_edge_t trigger,
+                                    dspic33ak_gpio_event_callback_t callback,
+                                    void *user_data);
+
+bool dspic33ak_gpio_event_rp_detach(dspic33ak_gpio_rp_t rp);
+
+bool dspic33ak_gpio_event_rp_irq_enable(dspic33ak_gpio_rp_t rp,
+                                        uint8_t priority);
+
+bool dspic33ak_gpio_event_rp_irq_disable(dspic33ak_gpio_rp_t rp);
+
+bool dspic33ak_gpio_event_rp_irq_is_enabled(dspic33ak_gpio_rp_t rp,
+                                            bool *enabled);
+
+bool dspic33ak_gpio_event_rp_irq_set_enabled(dspic33ak_gpio_rp_t rp,
+                                             bool enable);
 
 void dspic33ak_gpio_event_process_isr(void);
 ```
@@ -49,7 +78,20 @@ void __attribute__((__interrupt__, __no_auto_psv__)) _CNBInterrupt(void)
 ```
 
 This keeps the HAL reusable for different applications that may choose different
-CN ports, priorities, nesting rules, or interrupt routing.
+CN ports, nesting rules, or interrupt routing.
+
+The application owns the policy for interrupt setup. It may program CNxIP,
+CNxIF, and CNxIE itself, or it may use the optional HAL helpers:
+
+- `dspic33ak_gpio_event_irq_enable()` sets the CN port priority, clears the
+  port interrupt flag, and enables the CN port interrupt.
+- `dspic33ak_gpio_event_irq_disable()` disables the CN port interrupt and clears
+  the port interrupt flag.
+- `dspic33ak_gpio_event_irq_is_enabled()` reads only the IEC enable bit.
+- `dspic33ak_gpio_event_irq_set_enabled()` writes only the IEC enable bit.
+
+The `_is_enabled()` / `_set_enabled()` pair is intended for short application
+critical sections that must not clear a pending CN event.
 
 ## CN Flag Ownership
 
@@ -62,9 +104,9 @@ the event layer:
 - It clears the matching port interrupt flag, such as `CNBIF` through the port's
   `IFSx` register mask.
 
-The application still owns interrupt setup. In the original SW3 validation path,
-the app cleared `_CNBIF`, set `_CNBIP`, and enabled `_CNBIE` after SW3 was
-configured and attached.
+The application owns interrupt setup policy. In the starter SW3 validation
+path, the app uses the RP-first IRQ helper instead of naming `_CNBIP`, `_CNBIF`,
+or `_CNBIE` directly.
 
 ## Edge Detection
 
@@ -98,7 +140,9 @@ callback stays small and does not directly touch LED outputs.
 
 The application must configure the pin as a digital input before attaching an
 event. Use `dspic33ak_gpio_config()` with an explicit config struct for a
-single-call, glitch-aware setup:
+single-call, glitch-aware setup. Interrupt priority and enable are a separate
+explicit step through the optional IRQ helpers or through application-owned
+register setup.
 
 ## Consumer Snippet
 
@@ -141,7 +185,19 @@ void app_gpio_event_init(void)
                                       DSPIC33AK_GPIO_EVENT_EDGE_EITHER,
                                       sw3_event_cb,
                                       0);
+    (void)dspic33ak_gpio_event_irq_enable(BOARD_SW3, 4u);
 }
+```
+
+When the board pin is naturally named by RP number, use the RP-first wrappers:
+
+```c
+(void)dspic33ak_gpio_rp_config(BOARD_SW3_RP, &sw_cfg);
+(void)dspic33ak_gpio_event_rp_attach(BOARD_SW3_RP,
+                                     DSPIC33AK_GPIO_EVENT_EDGE_EITHER,
+                                     sw3_event_cb,
+                                     0);
+(void)dspic33ak_gpio_event_rp_irq_enable(BOARD_SW3_RP, 4u);
 ```
 
 ## Current Validation Behavior
