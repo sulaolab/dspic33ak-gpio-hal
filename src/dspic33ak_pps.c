@@ -8,7 +8,7 @@
  *   - output pin register  : _RP<nn>R       (RPORx bit-field alias)
  *   - input-select register: _<sig>R        (RPINRx bit-field alias)
  * A peripheral / RP the selected device header does not define is left out of the
- * relevant switch and the call returns false -- no __dsPIC33AK___ conditionals.
+ * relevant switch and the call returns false -- no per-device part-number conditionals.
  */
 
 #include "dspic33ak_pps.h"

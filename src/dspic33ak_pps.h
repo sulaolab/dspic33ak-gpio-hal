@@ -23,7 +23,7 @@
  * Device adaptation: the implementation keys off the XC SFR/constant macros
  * (_RPOUT_xxx, _RPnnR, the input-select registers) with #ifdef, so a peripheral
  * or RP that the selected device does not define is simply unroutable (the call
- * returns false) -- no per-device __dsPIC33AK___ conditionals here.
+ * returns false) -- no per-device part-number conditionals here.
  *
  * Coverage: both route_* accept any PHYSICAL remappable pin the selected device
  * defines (RP1..RP128, #ifdef-guarded on _RPnnR). RP is a dspic33ak_gpio_rp_t
