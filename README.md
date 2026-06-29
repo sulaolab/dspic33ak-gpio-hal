@@ -287,6 +287,12 @@ Optional event layer:
 
 * `dspic33ak_gpio_event_attach()`      — register one packed-pin event callback
 * `dspic33ak_gpio_event_detach()`      — unregister one packed-pin event
+* `dspic33ak_gpio_event_irq_enable()` / `_disable()` — configure the CN port
+  interrupt line for setup/teardown
+* `dspic33ak_gpio_event_irq_is_enabled()` / `_set_enabled()` — read/write only
+  the IEC enable bit without clearing a pending CN event
+* `dspic33ak_gpio_event_rp_*()` — RP-first wrappers for CN attach/detach and
+  CN interrupt helper operations
 * `dspic33ak_gpio_event_process_isr()` — app-called CN event dispatcher
 
 The setters take a packed pin from `DSPIC33AK_GPIO_PIN()` (or use the RP-first
@@ -320,6 +326,8 @@ automatically and the driver body stays device-neutral.
   still owns the policy — which signal maps to which RP pin.
 * The optional event layer does not change ANSEL, TRIS, CNPU/CNPD, PPS,
   interrupt priority, or IEC enable bits in `dspic33ak_gpio_event_attach()`.
+  Optional IRQ helpers are available when the application wants the HAL to hide
+  the scattered CNxIP/CNxIF/CNxIE symbols.
 * CMSIS-Driver GPIO-style wrappers are intentionally kept in separate
   repositories, such as `dspic33ak-gpio-cmsis-driver`.
 * This HAL checks whether a GPIO port exists in the selected device header. It
